@@ -5,6 +5,9 @@ using namespace std;
 typedef enum { blank, player, machine } tValues;
 const int N = 3;
 typedef tValues tBoard[N][N];
+typedef int tSol[N * N][2];		// Array of tuples of (posX,posY)
+typedef int tMarker[N][N];
+
 
 // INTERFACE
 void print ( const tBoard &board );
@@ -22,6 +25,12 @@ tValues hasSomeoneWin ( const tBoard &board );		// Return: blank = nobody, playe
 bool isMachineWin ( const tBoard &board );
 bool isPlayerWin ( const tBoard &board );
 
+// ARTIFICIAL INTELLIGENCE
+void computeAllPossibleMoves ( const tBoard &board );
+void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories, tMarker &losses );
+void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses );
+void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses );
+
 int main () {
 	tBoard board = { blank };
 	int posX, posY;
@@ -37,6 +46,51 @@ int main () {
 		cout << "Player wins" << endl;
 	}
 	return 0;
+}
+
+// ARTIFICIAL INTELLIGENCE
+
+void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories, tMarker &losses ) {
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+
+			if ( isPosEmpty ( boardSol, i, j ) ) {
+				placePiece ( boardSol, i, j, machine );
+				placePieceInArray ( arraySol, i, j, machine );
+				if ( hasSomeoneWin ( boardSol ) ) {
+					treatSol ( boardSol, arraySol, victories, losses );
+				}
+				else if ( isBoardFull ( boardSol ) ) {
+					// do nothing
+				}
+				else{
+					backtracking ( boardSol, arraySol, k + 1, victories, losses );
+				}
+				removePiece ( boardSol, i, j );
+				removePieceFromArray ( arraySol, i, j, k );
+			}
+
+		}
+	}
+}
+
+void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses ) {
+	if ( isPlayerWin ( boardSol ) ) {
+		victories[ arraySol[0][0] ][ arraySol[0][1] ] += 1;
+	}
+	else if ( isMachineWin ( boardSol ) ) {
+		losses[arraySol[0][0]][arraySol[0][1]] += 1;
+	}
+}
+void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses ) {
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+			if ( !isPosEmpty ( board, i, j ) ) {
+				victories[i][j] = -1;
+				losses[i][j] = -1;
+			}
+		}
+	}
 }
 
 // UTILITIES
