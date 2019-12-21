@@ -5,7 +5,7 @@ using namespace std;
 typedef enum { blank, player, machine } tValues;
 const int N = 3;
 typedef tValues tBoard[N][N];
-typedef int tSol[N * N][2];		// Array of tuples of (posX,posY)
+typedef int tSol[N * N][3];		// Array of tuples of (posX,posY)
 typedef int tMarker[N][N];
 
 
@@ -17,19 +17,30 @@ string valueToChar ( tValues value );
 void askUser ( const tBoard &board, int &posX, int &posY );
 
 // UTILITIES
+//int getArraySize ( tSol &sol );
+void initializeBoardSol ( tBoard &boardSol, const tBoard &board );
+void initializeArray ( tSol &arraySol );
+void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses );
 bool isPosEmpty ( const tBoard &board, int posX, int posY );
 void placePiece ( tBoard &board, int posX, int posY, tValues value);
+void placePieceInArray ( tSol &arraySol, int posX, int posY, tValues value, int k );
+void removePiece ( tBoard &board, int posX, int posY );
+void removePieceFromArray ( tSol &arraySol, int posX, int posY, int k);
 bool isValidPos ( int posX, int posY );
 bool isBoardFull ( const tBoard &board );
 tValues hasSomeoneWin ( const tBoard &board );		// Return: blank = nobody, player = player...
 bool isMachineWin ( const tBoard &board );
 bool isPlayerWin ( const tBoard &board );
+void getGreatestFromVictories ( const tMarker &marker, int &posX, int &posY, bool &isUnique );
+void getLowestWithValueFromLosses ( const tMarker &victories, const tMarker &losses,
+								    int value, int &posX, int &posY, bool &isUnique );
+
 
 // ARTIFICIAL INTELLIGENCE
-void computeAllPossibleMoves ( const tBoard &board );
+void computeAllPossibleMoves ( const tBoard &board, tMarker &victories, tMarker &losses );
 void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories, tMarker &losses );
 void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses );
-void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses );
+void decideNextMachMove ( const tBoard &board, int &posX, int &posY );
 
 int main () {
 	tBoard board = { blank };
@@ -50,13 +61,55 @@ int main () {
 
 // ARTIFICIAL INTELLIGENCE
 
+void decideNextMachMove ( const tBoard &board, int &posX, int &posY) {
+	tMarker victories, losses;
+	initializeMarkers ( board, victories, losses );
+
+	computeAllPossibleMoves ( board, victories, losses );
+
+	bool highestVictUnique;
+	int highestVictPosX, highestVictPosY;
+	getGreatestFromVictories ( victories, highestVictPosX, highestVictPosY, highestVictUnique );
+	if ( highestVictUnique ) {
+		posX = highestVictPosX;
+		posY = highestVictPosY;
+	}
+	else {
+		bool lowestLossesUnique;
+		int lowestLossesPosX, lowestLossesPosY;
+		getLowestWithValueFromLosses ( victories, losses, victories[highestVictPosY][highestVictPosX],
+			lowestLossesPosX, lowestLossesPosY, lowestLossesUnique );
+		if ( lowestLossesUnique ) {
+			posX = lowestLossesPosX;
+			posY = lowestLossesPosY;
+		}
+		else {
+			// Pick one of the options because several have same num of vict and losses
+			posX = lowestLossesPosX;
+			posY = lowestLossesPosY;
+		}
+	}
+}
+
+void computeAllPossibleMoves ( const tBoard &board, tMarker &victories, tMarker &losses) {
+	// 1: Create arraySol and initialize it to -1
+	tSol arraySol;
+	initializeArray ( arraySol );
+	// 2: Create boardSol and initialize it to a copy of board
+	tBoard boardSol;
+	initializeBoardSol ( boardSol, board );	
+
+	backtracking ( boardSol, arraySol, 0, victories, losses );	
+}
+
+
 void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories, tMarker &losses ) {
 	for ( int i = 0; i < N; i++ ) {
 		for ( int j = 0; j < N; j++ ) {
 
 			if ( isPosEmpty ( boardSol, i, j ) ) {
 				placePiece ( boardSol, i, j, machine );
-				placePieceInArray ( arraySol, i, j, machine );
+				placePieceInArray ( arraySol, i, j, machine, k );
 				if ( hasSomeoneWin ( boardSol ) ) {
 					treatSol ( boardSol, arraySol, victories, losses );
 				}
@@ -82,6 +135,36 @@ void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories
 		losses[arraySol[0][0]][arraySol[0][1]] += 1;
 	}
 }
+
+
+
+
+// UTILITIES
+
+//int getArraySize ( tSol &sol ) {
+//	int i = 0;
+//	while ( i < N && sol[i][0] != -1 ) {
+//		i++;
+//	}
+//	return 0;
+//}
+
+void initializeBoardSol ( tBoard &boardSol, const tBoard & board ) {
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+			boardSol[i][j] = board[i][j];
+		}
+	}
+}
+
+void initializeArray ( tSol &arraySol ) {
+	for ( int i = 0; i < N; i++ ) {
+		arraySol[i][0] = -1;
+		arraySol[i][1] = -1;
+		arraySol[i][2] = -1;
+	}
+}
+
 void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses ) {
 	for ( int i = 0; i < N; i++ ) {
 		for ( int j = 0; j < N; j++ ) {
@@ -93,13 +176,29 @@ void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losse
 	}
 }
 
-// UTILITIES
 bool isPosEmpty ( const tBoard &board, int posX, int posY ) {
 	return (board[posY][posX] == blank);
 }
 
 void placePiece ( tBoard &board, int posX, int posY, tValues value ) {
 	board[posY][posX] = value;
+}
+
+void placePieceInArray ( tSol &arraySol, int posX, int posY, tValues value, int k ) {
+	//int size = getArraySize ( boardSol );
+	arraySol[k][0] = posX;
+	arraySol[k][1] = posY;
+	arraySol[k][2] = value;		// Int representation of enum (blank = 0, player = 1...)
+}
+
+void removePiece ( tBoard &board, int posX, int posY ) {
+	board[posY][posX] = blank;
+}
+
+void removePieceFromArray ( tSol &arraySol, int posX, int posY, int k ) {
+	arraySol[k][0] = -1;
+	arraySol[k][1] = -1;
+	arraySol[k][2] = -1;
 }
 
 bool isValidPos ( int posX, int posY ) {
@@ -188,8 +287,65 @@ tValues hasSomeoneWin ( const tBoard &board ) {
 bool isMachineWin ( const tBoard &board ) {
 	return (hasSomeoneWin ( board ) == machine);
 }
+
 bool isPlayerWin ( const tBoard &board ) {
 	return (hasSomeoneWin ( board ) == player);
+}
+
+void getGreatestFromVictories ( const tMarker &victories, int &posX, int &posY, bool &isUnique) {
+	int tmpGreatest = 0;
+	int tmpGreatestPosX, tmpGreatestPosY;
+	bool tmpIsUnique = true;
+
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+			if ( victories[i][j] > tmpGreatest ) {
+				tmpIsUnique = true;
+				tmpGreatest = victories[i][j];
+				tmpGreatestPosX = j;
+				tmpGreatestPosY = i;
+			}
+			else if ( victories[i][j] == tmpGreatest ) {
+				tmpIsUnique = false;
+				tmpGreatest = victories[i][j];
+				tmpGreatestPosX = j;
+				tmpGreatestPosY = i;
+			}
+		}
+	}
+	posX = tmpGreatestPosX;
+	posY = tmpGreatestPosY;
+	isUnique = tmpIsUnique;
+}
+
+void getLowestWithValueFromLosses ( const tMarker &victories, const tMarker &losses,
+						   int value, int &posX, int &posY, bool &isUnique ) {
+	int tmpLowest = 10000;		//arbitrary high number
+	int tmpLowestPosX, tmpLowestPosY;
+	bool tmpIsUnique = true;
+
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+			if ( victories[i][j] == value ) {
+				if ( losses[i][j] < tmpLowest ) {
+					tmpIsUnique = true;
+					tmpLowest = losses[i][j];
+					tmpLowestPosX = j;
+					tmpLowestPosY = i;
+				}
+				else if ( losses[i][j] == tmpLowest ) {
+					tmpIsUnique = false;
+					tmpLowest = losses[i][j];
+					tmpLowestPosX = j;
+					tmpLowestPosY = i;
+				}
+			}
+		}
+	}
+	posX = tmpLowestPosX;
+	posY = tmpLowestPosY;
+	isUnique = tmpIsUnique;
+
 }
 
 
