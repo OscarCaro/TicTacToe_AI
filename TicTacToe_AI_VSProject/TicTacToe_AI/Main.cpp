@@ -50,6 +50,11 @@ int main () {
 		print ( board );
 		askUser ( board, posX, posY );
 		placePiece ( board, posX, posY, player );
+
+		if ( !isBoardFull ( board ) && !isMachineWin ( board ) && !isPlayerWin ( board ) ) {
+			decideNextMachMove ( board, posX, posY );
+			placePiece ( board, posX, posY, machine );
+		}
 	}
 
 	print ( board );
@@ -158,7 +163,7 @@ void initializeBoardSol ( tBoard &boardSol, const tBoard & board ) {
 }
 
 void initializeArray ( tSol &arraySol ) {
-	for ( int i = 0; i < N; i++ ) {
+	for ( int i = 0; i < N * N; i++ ) {
 		arraySol[i][0] = -1;
 		arraySol[i][1] = -1;
 		arraySol[i][2] = -1;
@@ -171,6 +176,10 @@ void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losse
 			if ( !isPosEmpty ( board, i, j ) ) {
 				victories[i][j] = -1;
 				losses[i][j] = -1;
+			}
+			else {
+				victories[i][j] = 0;
+				losses[i][j] = 0;
 			}
 		}
 	}
