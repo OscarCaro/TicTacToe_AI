@@ -19,7 +19,6 @@ string valueToChar ( tValues value );
 void askUser ( const tBoard &board, int &posX, int &posY );
 
 // UTILITIES
-//int getArraySize ( tSol &sol );
 void initializeBoardSol ( tBoard &boardSol, const tBoard &board );
 void initializeArray ( tSol &arraySol );
 void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses );
@@ -44,7 +43,7 @@ void mixMarkers ( tMarker &mix, const tMarker &victories, const tMarker &losses 
 // ARTIFICIAL INTELLIGENCE
 void computeAllPossibleMoves ( const tBoard &board, tMarker &victories, tMarker &losses );
 void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories, tMarker &losses );
-void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses );
+void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses, int k );
 void decideNextMachMove ( const tBoard &board, int &posX, int &posY );
 
 int main () {
@@ -66,6 +65,12 @@ int main () {
 	if ( isPlayerWin ( board ) ) {
 		cout << "Player wins" << endl;
 	}
+	else if ( isMachineWin ( board ) ) {
+		cout << "Player losses" << endl;
+	}
+	else {
+		cout << "Tie" << endl;
+	}
 	return 0;
 }
 
@@ -80,29 +85,6 @@ void decideNextMachMove ( const tBoard &board, int &posX, int &posY) {
 	tMarker mix;
 	mixMarkers ( mix, victories, losses );
 	getBestMovement ( mix, posX, posY );
-
-	//bool highestVictUnique;
-	//int highestVictPosX, highestVictPosY;
-	//getGreatestFromVictories ( victories, highestVictPosX, highestVictPosY, highestVictUnique );
-	//if ( highestVictUnique ) {
-	//	posX = highestVictPosX;
-	//	posY = highestVictPosY;
-	//}
-	//else {
-	//	bool lowestLossesUnique;
-	//	int lowestLossesPosX, lowestLossesPosY;
-	//	getLowestWithValueFromLosses ( victories, losses, victories[highestVictPosY][highestVictPosX],
-	//		lowestLossesPosX, lowestLossesPosY, lowestLossesUnique );
-	//	if ( lowestLossesUnique ) {
-	//		posX = lowestLossesPosX;
-	//		posY = lowestLossesPosY;
-	//	}
-	//	else {
-	//		// Pick one of the options because several have same num of vict and losses
-	//		posX = lowestLossesPosX;
-	//		posY = lowestLossesPosY;
-	//	}
-	//}
 }
 
 void computeAllPossibleMoves ( const tBoard &board, tMarker &victories, tMarker &losses) {
@@ -133,7 +115,7 @@ void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories,
 				}
 
 				if ( hasSomeoneWin ( boardSol ) ) {
-					treatSol ( boardSol, arraySol, victories, losses );
+					treatSol ( boardSol, arraySol, victories, losses, k );
 				}
 				else if ( isBoardFull ( boardSol ) ) {
 					// do nothing
@@ -149,27 +131,35 @@ void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories,
 	}
 }
 
-void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses ) {
+void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses, int k ) {
+	// k indicates the num of movements that this solution has taken to happen
+	// Example: k=2 means this sequence of movements: mach, then player, then mach
+
 	if ( isPlayerWin ( boardSol ) ) {
-		losses[ arraySol[0][1] ][ arraySol[0][0] ] += 1;
+		if ( k <= 1 ) {
+			// imminent player win -> must avoid this scenario ->
+			// -> give a lot of weight to this cell 
+			losses[arraySol[0][1]][arraySol[0][0]] += 200;
+		}
+		else {
+			// Give relative weight to this cell
+			losses[arraySol[0][1]][arraySol[0][0]] += N * N - k;
+		}
 	}
 	else if ( isMachineWin ( boardSol ) ) {
-		victories[arraySol[0][1]][arraySol[0][0]] += 1;
+		if ( k <= 1 ) {
+			// imminent machine win -> must follow this scenario ->
+			// -> give a lot of weight to this cell 
+			victories[arraySol[0][1]][arraySol[0][0]] += 200;
+		}
+		else {
+			victories[arraySol[0][1]][arraySol[0][0]] += N * N - k;
+		}
 	}
 }
 
 
-
-
 // UTILITIES
-
-//int getArraySize ( tSol &sol ) {
-//	int i = 0;
-//	while ( i < N && sol[i][0] != -1 ) {
-//		i++;
-//	}
-//	return 0;
-//}
 
 void initializeBoardSol ( tBoard &boardSol, const tBoard & board ) {
 	for ( int i = 0; i < N; i++ ) {
@@ -215,7 +205,6 @@ void placePiece ( tBoard &board, int posX, int posY, tValues value ) {
 }
 
 void placePieceInArray ( tSol &arraySol, int posX, int posY, tValues value, int k ) {
-	//int size = getArraySize ( boardSol );
 	arraySol[k][0] = posX;
 	arraySol[k][1] = posY;
 	arraySol[k][2] = value;		// Int representation of enum (blank = 0, player = 1...)
