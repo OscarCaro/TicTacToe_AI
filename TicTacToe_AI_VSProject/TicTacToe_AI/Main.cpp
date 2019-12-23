@@ -8,6 +8,8 @@ typedef tValues tBoard[N][N];
 typedef int tSol[N * N][3];		// Array of tuples of (posX,posY)
 typedef int tMarker[N][N];
 
+const int UNUSABLE = 100000;
+
 
 // INTERFACE
 void print ( const tBoard &board );
@@ -21,6 +23,7 @@ void askUser ( const tBoard &board, int &posX, int &posY );
 void initializeBoardSol ( tBoard &boardSol, const tBoard &board );
 void initializeArray ( tSol &arraySol );
 void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losses );
+bool isEven ( int k );
 bool isPosEmpty ( const tBoard &board, int posX, int posY );
 void placePiece ( tBoard &board, int posX, int posY, tValues value);
 void placePieceInArray ( tSol &arraySol, int posX, int posY, tValues value, int k );
@@ -31,9 +34,11 @@ bool isBoardFull ( const tBoard &board );
 tValues hasSomeoneWin ( const tBoard &board );		// Return: blank = nobody, player = player...
 bool isMachineWin ( const tBoard &board );
 bool isPlayerWin ( const tBoard &board );
+void getBestMovement ( const tMarker &marker, int &posX, int &posY );
 void getGreatestFromVictories ( const tMarker &marker, int &posX, int &posY, bool &isUnique );
 void getLowestWithValueFromLosses ( const tMarker &victories, const tMarker &losses,
 								    int value, int &posX, int &posY, bool &isUnique );
+void mixMarkers ( tMarker &mix, const tMarker &victories, const tMarker &losses );
 
 
 // ARTIFICIAL INTELLIGENCE
@@ -72,28 +77,32 @@ void decideNextMachMove ( const tBoard &board, int &posX, int &posY) {
 
 	computeAllPossibleMoves ( board, victories, losses );
 
-	bool highestVictUnique;
-	int highestVictPosX, highestVictPosY;
-	getGreatestFromVictories ( victories, highestVictPosX, highestVictPosY, highestVictUnique );
-	if ( highestVictUnique ) {
-		posX = highestVictPosX;
-		posY = highestVictPosY;
-	}
-	else {
-		bool lowestLossesUnique;
-		int lowestLossesPosX, lowestLossesPosY;
-		getLowestWithValueFromLosses ( victories, losses, victories[highestVictPosY][highestVictPosX],
-			lowestLossesPosX, lowestLossesPosY, lowestLossesUnique );
-		if ( lowestLossesUnique ) {
-			posX = lowestLossesPosX;
-			posY = lowestLossesPosY;
-		}
-		else {
-			// Pick one of the options because several have same num of vict and losses
-			posX = lowestLossesPosX;
-			posY = lowestLossesPosY;
-		}
-	}
+	tMarker mix;
+	mixMarkers ( mix, victories, losses );
+	getBestMovement ( mix, posX, posY );
+
+	//bool highestVictUnique;
+	//int highestVictPosX, highestVictPosY;
+	//getGreatestFromVictories ( victories, highestVictPosX, highestVictPosY, highestVictUnique );
+	//if ( highestVictUnique ) {
+	//	posX = highestVictPosX;
+	//	posY = highestVictPosY;
+	//}
+	//else {
+	//	bool lowestLossesUnique;
+	//	int lowestLossesPosX, lowestLossesPosY;
+	//	getLowestWithValueFromLosses ( victories, losses, victories[highestVictPosY][highestVictPosX],
+	//		lowestLossesPosX, lowestLossesPosY, lowestLossesUnique );
+	//	if ( lowestLossesUnique ) {
+	//		posX = lowestLossesPosX;
+	//		posY = lowestLossesPosY;
+	//	}
+	//	else {
+	//		// Pick one of the options because several have same num of vict and losses
+	//		posX = lowestLossesPosX;
+	//		posY = lowestLossesPosY;
+	//	}
+	//}
 }
 
 void computeAllPossibleMoves ( const tBoard &board, tMarker &victories, tMarker &losses) {
@@ -113,8 +122,16 @@ void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories,
 		for ( int j = 0; j < N; j++ ) {
 
 			if ( isPosEmpty ( boardSol, i, j ) ) {
-				placePiece ( boardSol, i, j, machine );
-				placePieceInArray ( arraySol, i, j, machine, k );
+
+				if ( isEven ( k ) ) {
+					placePiece ( boardSol, i, j, machine );
+					placePieceInArray ( arraySol, i, j, machine, k );
+				}
+				else {
+					placePiece ( boardSol, i, j, player );
+					placePieceInArray ( arraySol, i, j, player, k );
+				}
+
 				if ( hasSomeoneWin ( boardSol ) ) {
 					treatSol ( boardSol, arraySol, victories, losses );
 				}
@@ -134,10 +151,10 @@ void backtracking ( tBoard &boardSol, tSol &arraySol, int k, tMarker &victories,
 
 void treatSol ( const tBoard &boardSol, const tSol &arraySol, tMarker &victories, tMarker &losses ) {
 	if ( isPlayerWin ( boardSol ) ) {
-		victories[ arraySol[0][0] ][ arraySol[0][1] ] += 1;
+		losses[ arraySol[0][1] ][ arraySol[0][0] ] += 1;
 	}
 	else if ( isMachineWin ( boardSol ) ) {
-		losses[arraySol[0][0]][arraySol[0][1]] += 1;
+		victories[arraySol[0][1]][arraySol[0][0]] += 1;
 	}
 }
 
@@ -174,15 +191,19 @@ void initializeMarkers ( const tBoard &board, tMarker &victories, tMarker &losse
 	for ( int i = 0; i < N; i++ ) {
 		for ( int j = 0; j < N; j++ ) {
 			if ( !isPosEmpty ( board, i, j ) ) {
-				victories[i][j] = -1;
-				losses[i][j] = -1;
+				victories[j][i] = -1;
+				losses[j][i] = -1;
 			}
 			else {
-				victories[i][j] = 0;
-				losses[i][j] = 0;
+				victories[j][i] = 0;
+				losses[j][i] = 0;
 			}
 		}
 	}
+}
+
+bool isEven ( int k ) {
+	return (k % 2 == 0);
 }
 
 bool isPosEmpty ( const tBoard &board, int posX, int posY ) {
@@ -301,6 +322,33 @@ bool isPlayerWin ( const tBoard &board ) {
 	return (hasSomeoneWin ( board ) == player);
 }
 
+void getBestMovement ( const tMarker &marker, int &posX, int &posY ) {
+	int tmpGreatest = UNUSABLE;
+	int tmpGreatestPosX, tmpGreatestPosY;
+
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+			if ( marker[i][j] != UNUSABLE ) {
+				if ( tmpGreatest == UNUSABLE ) {
+					// Set first 
+					tmpGreatest = marker[i][j];
+					tmpGreatestPosX = j;
+					tmpGreatestPosY = i;
+				}
+				else if ( marker[i][j] > tmpGreatest ) {
+					// Compare
+					tmpGreatest = marker[i][j];
+					tmpGreatestPosX = j;
+					tmpGreatestPosY = i;
+				}					
+			}
+		}
+	}
+	posX = tmpGreatestPosX;
+	posY = tmpGreatestPosY;
+}
+
+
 void getGreatestFromVictories ( const tMarker &victories, int &posX, int &posY, bool &isUnique) {
 	int tmpGreatest = 0;
 	int tmpGreatestPosX, tmpGreatestPosY;
@@ -356,6 +404,20 @@ void getLowestWithValueFromLosses ( const tMarker &victories, const tMarker &los
 	isUnique = tmpIsUnique;
 
 }
+
+void mixMarkers ( tMarker &mix, const tMarker &victories, const tMarker &losses ) {
+	for ( int i = 0; i < N; i++ ) {
+		for ( int j = 0; j < N; j++ ) {
+			if ( victories[i][j] == -1 ) {
+				mix[i][j] = UNUSABLE;			// Arbitraty number that indicates cell is not usable
+			}
+			else {
+				mix[i][j] = victories[i][j] - losses[i][j];
+			}
+		}
+	}
+}
+
 
 
 
